@@ -34,30 +34,24 @@ in the [midnight-node repository](https://github.com/midnightntwrk/midnight-node
 Complete well ahead of any governance action. Nothing here changes which
 engine produces blocks.
 
-### 0.1 Generate, load, and submit BABE keys — every validator
+### 0.1 Generate and submit BABE and BEEFY keys — every validator
 
-This can and should be executed even before Midnight release that contains
-migration code.
+This needs only the binary of the Midnight release that contains the
+migration code, not the node running it: it can and should be done before
+the binary rollout.
 
-1. **Generate a fresh, unique sr25519 key pair.** Never reuse any existing
-   key, including the validator's AURA key.
-2. **Load it into the keystore** (key type `babe`), one of:
-
-- `BABE_SEED_FILE` (config key `babe_seed_file`) pointing at the secret —
-  the node inserts it at startup and logs `BABE pubkey: <ss58>`;
-- `midnight-node key insert --chain <chainspec> --keystore-path <path>
---scheme sr25519 --key-type babe --suri '<secret>'`.
-
-Either way, the next node startup logs every BABE key the keystore actually
-holds (see Verify below) — a single check that covers both insertion paths.
+1. **Generate the keys** with `midnight-node generate-session-keys`, as
+   described in [Generating session keys](session-key-generation.md#aura-to-babe-migration).
+   Pass the v3 runtime with `--runtime-wasm`: the runtime on the chain before
+   the upgrade does not define the `babe` key.
 
 Do **not** use the `author_insertKey` RPC — unsafe-classified; a
 production validator must never expose unsafe RPC methods.
 
-3. **Submit the BABE public key** to the network operator.
-   When submitting BABE public key, attach also cross-chain public key,
-   so the network operator will be able to attach the BABE key to
-   a proper item in permissioned-candidates list.
+2. **Submit the `babe` and `beef` public keys** to the network operator,
+   with the cross-chain public key (`sidechain_pub_key`), so the network
+   operator can attach them to the right item in the
+   permissioned-candidates list.
 
 **Verify (per validator):**
 
@@ -316,7 +310,7 @@ and [fork-testing.md](https://github.com/midnightntwrk/midnight-node/blob/main/d
 | BABE authorities           | `babe.authorities()`                                                                                                                                                                                                                                                        |
 | Activation sentinel        | `babe.genesisSlot()` == `u64::MAX` between the runtime upgrade and the flip                                                                                                                                                                                                 |
 | Validator readiness metric | `midnight_babe_key_registered` (validators with Prometheus; 1 = keystore key registered on Cardano)                                                                                                                                                                         |
-| BABE key type              | `babe` (keystore file prefix `62616265`), sr25519; loaded via `BABE_SEED_FILE` or `midnight-node key insert` (never `author_insertKey`)                                                                                                                                     |
+| BABE key type              | `babe` (keystore file prefix `62616265`), sr25519; generated with `midnight-node generate-session-keys` (never `author_insertKey`)                                                                                                                                          |
 | Cardano registration       | permissioned-candidates list `babe_pub_key` (all candidates are permissioned)                                                                                                                                                                                               |
 | Flip timing                | Last slot of an epoch while in `ScheduledFlip` and `babe.authorities()` non-empty; BABE genesis = first slot of next epoch                                                                                                                                                  |
 | Log targets                | `consensus-engine` (activation, flip, postponement), `babe-authoring` (flip, epoch-tree seed, handover), `babe-predigest` (digest attachment), `aura-to-babe-migration-keystore` (key fallbacks), `babe-key-readiness` (keystore's BABE public keys logged on every startup; periodic probe), `committee-membership` (session membership) |
